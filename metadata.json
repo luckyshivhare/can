@@ -1,0 +1,6 @@
+{
+  "name": "CAV-SHIELD — AI-Powered Connected Autonomous Vehicle IDS",
+  "description": "Cybersecurity simulation dashboard and intrusion detection system for connected autonomous vehicles with real-time CAN bus telemetry and Python IDS integration layer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

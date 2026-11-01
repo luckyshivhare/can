@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   AttackType,
@@ -8,6 +9,9 @@ import {
   SimulationState,
   TrafficHistoryPoint
 } from '../types/can';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const apiUrl = (path: string) => API_BASE_URL + path;
 
 interface DashboardSnapshot {
   simulationState: SimulationState;
@@ -81,12 +85,11 @@ export function useCanBus() {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isError, setIsError] = useState<boolean>(false);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch once or poll
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/ids/status');
+      const res = await fetch(apiUrl('/api/ids/status'));
       if (res.ok) {
         const json = await res.json();
         if (json.data) {
@@ -103,9 +106,8 @@ export function useCanBus() {
   useEffect(() => {
     fetchStatus();
 
-    // Setup SSE connection
     if (typeof EventSource !== 'undefined') {
-      const es = new EventSource('/api/ids/stream');
+      const es = new EventSource(apiUrl('/api/ids/stream'));
       eventSourceRef.current = es;
 
       es.onopen = () => {
@@ -128,7 +130,6 @@ export function useCanBus() {
 
       es.onerror = () => {
         es.close();
-        // Fallback to polling if SSE drops
         if (!pollIntervalRef.current) {
           pollIntervalRef.current = setInterval(fetchStatus, 800);
         }
@@ -136,8 +137,10 @@ export function useCanBus() {
 
       return () => {
         es.close();
+        eventSourceRef.current = null;
         if (pollIntervalRef.current) {
           clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
         }
       };
     } else {
@@ -145,15 +148,15 @@ export function useCanBus() {
       return () => {
         if (pollIntervalRef.current) {
           clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
         }
       };
     }
   }, [fetchStatus]);
 
-  // Actions
   const startTraffic = async () => {
     try {
-      await fetch('/api/ids/simulate', {
+      await fetch(apiUrl('/api/ids/simulate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'start' })
@@ -166,7 +169,7 @@ export function useCanBus() {
 
   const stopSimulation = async () => {
     try {
-      await fetch('/api/ids/simulate', {
+      await fetch(apiUrl('/api/ids/simulate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'stop' })
@@ -179,7 +182,7 @@ export function useCanBus() {
 
   const resetSimulation = async () => {
     try {
-      await fetch('/api/ids/simulate', {
+      await fetch(apiUrl('/api/ids/simulate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reset' })
@@ -192,7 +195,7 @@ export function useCanBus() {
 
   const injectAttack = async (attackType: AttackType, intensity: number = 5) => {
     try {
-      await fetch('/api/ids/simulate', {
+      await fetch(apiUrl('/api/ids/simulate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'inject', attackType, intensity })
@@ -205,7 +208,7 @@ export function useCanBus() {
 
   const clearAttack = async () => {
     try {
-      await fetch('/api/ids/simulate', {
+      await fetch(apiUrl('/api/ids/simulate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'clear_attack' })
@@ -218,7 +221,7 @@ export function useCanBus() {
 
   const togglePythonMock = async (connect: boolean) => {
     try {
-      await fetch('/api/ids/test-connect-python', {
+      await fetch(apiUrl('/api/ids/test-connect-python'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ connect })
@@ -229,12 +232,20 @@ export function useCanBus() {
     }
   };
 
-  const ingestManualFrame = async (canId: string, payload: string, ecuSource?: string) => {
+  const ingestManualFrame = async (
+    canId: string,
+    payload: string,
+    ecuSource?: string
+  ) => {
     try {
-      const res = await fetch('/api/ids/ingest', {
+      const res = await fetch(apiUrl('/api/ids/ingest'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ canId, payload, ecuSource: ecuSource || 'MANUAL_INJECTOR' })
+        body: JSON.stringify({
+          canId,
+          payload,
+          ecuSource: ecuSource || 'MANUAL_INJECTOR'
+        })
       });
       fetchStatus();
       return await res.json();
